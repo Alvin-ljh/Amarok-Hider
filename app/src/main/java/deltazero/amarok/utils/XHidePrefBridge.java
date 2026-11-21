@@ -97,10 +97,20 @@ public class XHidePrefBridge {
         isAvailable = true;
     }
 
-    private static void commitNewValues() {
+    /**
+     * Push the currently hidden package names to the Xposed module.
+     * <p>
+     * Note: this uses {@link Hider#getHiddenPkgs()} (what is actually hidden right
+     * now) instead of {@link PrefMgr#getHideApps()} (the global hide list), so that
+     * per-app hiding is filtered by XHide as well.
+     */
+    public static void commitNewValues() {
+        if (xprefEditor == null)
+            return;
         Log.d(TAG, "Committing new values to XPref");
-        xprefEditor.putStringSet(XPref.HIDE_PKG_NAMES, PrefMgr.getHideApps());
-        xprefEditor.putBoolean(XPref.IS_ACTIVE, Hider.getState() == Hider.State.HIDDEN && PrefMgr.isXHideEnabled());
+        var hiddenPkgs = Hider.getHiddenPkgs();
+        xprefEditor.putStringSet(XPref.HIDE_PKG_NAMES, hiddenPkgs);
+        xprefEditor.putBoolean(XPref.IS_ACTIVE, !hiddenPkgs.isEmpty() && PrefMgr.isXHideEnabled());
         xprefEditor.commit();
     }
 }
