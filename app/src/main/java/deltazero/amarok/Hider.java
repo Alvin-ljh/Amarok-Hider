@@ -12,14 +12,20 @@ import android.widget.Toast;
 import androidx.lifecycle.MutableLiveData;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.topjohnwu.superuser.Shell;
+
+import java.util.HashSet;
+import java.util.Set;
 
 import deltazero.amarok.ui.settings.SwitchAppHiderActivity;
 import deltazero.amarok.utils.SecurityUtil;
+import deltazero.amarok.utils.XHidePrefBridge;
 
 
 public final class Hider {
 
     private static final String TAG = "Hider";
+    private static final String PREF_HIDDEN_PKGS = "perAppHiddenPkgs";
     private static final HandlerThread hiderThread = new HandlerThread("HIDER_THREAD");
     private static final Handler threadHandler;
 
@@ -39,7 +45,7 @@ public final class Hider {
 
     /**
      * This method should be invoked in {@link AmarokApplication#onCreate()}, after {@link PrefMgr#init(Context)}.
-     * Do not invoke this method in static part or before {@link PrefMgr#init(Context)}.
+     * Do not invoke this method in static part or before {@link PrefMgr#init()}.
      */
     public static void init() {
         assert PrefMgr.initialized;
@@ -58,6 +64,87 @@ public final class Hider {
     public static State getState() {
         return state.getValue();
     }
+
+    // ------------------------------------------------------------------
+    // Per-app hiding (root only)
+    // ------------------------------------------------------------------
+
+    /**
+     * Package names that are currently hidden (either by the global hide
+     * action or by a per-app hide action). This is what XHide filters out
+     * of PackageManager results, so partial hiding stays "invisible".
+     */
+    public static Set<String> getHiddenPkgs() {
+        return new HashSet<>(PrefMgr.getPrefs().getStringSet(PREF_HIDDEN_PKGS, new HashSet<>()));
+    }
+
+    public static void setHiddenPkgs(Set<String> pkgs) {
+        PrefMgr.getPrefs().edit().putStringSet(PREF_HIDDEN_PKGS, new HashSet<>(pkgs)).apply();
+    }
+
+    private static void addHiddenPkg(String pkg) {
+        Set<String> pkgs = getHiddenPkgs();
+        pkgs.add(pkg);
+        setHiddenPkgs(pkgs);
+    }
+
+    private static void removeHiddenPkg(String pkg) {
+        Set<String> pkgs = getHiddenPkgs();
+        pkgs.remove(pkg);
+        setHiddenPkgs(pkgs);
+    }
+
+    /**
+     * Hide a single app. Uses root directly (pm disable + pm hide) and blocks
+     * until the shell command finished, so that the caller can immediately
+     * launch the app afterwards.
+     */
+    public static void hideApp(Context context, String pkg, Runnable onDone) {
+        threadHandler.post(() -> {
+            Log.i(TAG, "Per-app hide: " + pkg);
+            Shell.Result result = Shell.cmd("pm disable " + pkg + "; pm hide " + pkg).exec();
+            Log.i(TAG, "Per-app hide result: " + result.getCode() + " " + result.getOut());
+            addHiddenPkg(pkg);
+            XHidePrefBridge.commitNewValues();
+            postToMain(onDone);
+        });
+    }
+
+    /**
+     * Unhide a single app (pm enable + pm unhide), blocking until done.
+     */
+    public static void unhideApp(Context context, String pkg, Runnable onDone) {
+        threadHandler.post(() -> {
+            Log.i(TAG, "Per-app unhide: " + pkg);
+            Shell.Result result = Shell.cmd("pm enable " + pkg + "; pm unhide " + pkg).exec();
+            Log.i(TAG, "Per-app unhide result: " + result.getCode() + " " + result.getOut());
+            removeHiddenPkg(pkg);
+            XHidePrefBridge.commitNewValues();
+            postToMain(onDone);
+        });
+    }
+
+    /**
+     * Launch an app from within Amarok. Must be called on the main thread.
+     */
+    public static void launchApp(Context context, String pkg) {
+        Intent intent = context.getPackageManager().getLaunchIntentForPackage(pkg);
+        if (intent == null) {
+            Toast.makeText(context, "无法启动该应用（可能仍处于隐藏状态）", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
+    }
+
+    private static void postToMain(Runnable runnable) {
+        if (runnable != null)
+            new Handler(Looper.getMainLooper()).post(runnable);
+    }
+
+    // ------------------------------------------------------------------
+    // Global hiding
+    // ------------------------------------------------------------------
 
     public static void hide(Context context) {
         PrefMgr.getAppHider(context).tryToActivate((appHiderClass, succeed, msg) -> {
@@ -90,6 +177,8 @@ public final class Hider {
                 boolean disableOnly = PrefMgr.isXHideEnabled() && PrefMgr.getDisableOnlyWithXHide();
 
                 PrefMgr.getAppHider(context).hide(PrefMgr.getHideApps(), disableOnly);
+                setHiddenPkgs(PrefMgr.getHideApps());
+                XHidePrefBridge.commitNewValues();
                 PrefMgr.getFileHider(context).hide(PrefMgr.getHideFilePath());
             } catch (InterruptedException e) {
                 Log.w(TAG, "Process 'hide' interrupted.");
@@ -129,6 +218,8 @@ public final class Hider {
 
             try {
                 PrefMgr.getAppHider(context).unhide(PrefMgr.getHideApps());
+                setHiddenPkgs(new HashSet<>());
+                XHidePrefBridge.commitNewValues();
                 PrefMgr.getFileHider(context).unhide(PrefMgr.getHideFilePath());
             } catch (InterruptedException e) {
                 Log.w(TAG, "Process 'unhide' interrupted.");
