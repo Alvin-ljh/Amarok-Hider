@@ -1,90 +1,85 @@
+# Amarok 改造：逐应用隐藏 + 列表内启动（Root + XHide）
 
-![banner](https://github.com/user-attachments/assets/63a8fc76-30a0-4460-85be-4264b1f69334)
+这是一个针对 [deltazefiro/Amarok-Hider](https://github.com/deltazefiro/Amarok-Hider) `main` 分支的最小改造，
+目标是把「只能一键全部隐藏」改成 Hail 那样**逐应用隐藏/恢复**，并且**在列表里点一下就能启动应用**。
 
-# Amarok-Hider
+- 只考虑 **Root 模式 + XHide**（其它隐藏模式代码未动，仍然可用但未测试）
+- **没有改动文件隐藏**（保持原样，不用可以无视）
+- 没有新增布局/菜单资源，交互是「点列表项 → 弹出操作对话框」
 
-[![](https://img.shields.io/github/v/release/deltazefiro/Amarok-Hider?label=GithubRelease)](https://github.com/deltazefiro/Amarok-Hider/releases)
-[![](https://img.shields.io/f-droid/v/deltazero.amarok.foss?color=blue)](https://f-droid.org/zh_Hans/packages/deltazero.amarok.foss/)
-[![](https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/deltazero.amarok.foss&color=orange)](https://apt.izzysoft.de/fdroid/index/apk/deltazero.amarok.foss)
+---
 
-🌐 **ENGLISH** | [简体中文](https://github.com/deltazefiro/Amarok-Hider/blob/main/README.zh.md)
+## 1. 改了什么
 
-## What is Amarok?
+| 文件 | 改动 |
+|---|---|
+| `app/src/main/java/deltazero/amarok/Hider.java` | 新增逐应用 `hideApp()` / `unhideApp()` / `launchApp()`，用 libsu 直接执行 `pm disable/hide`、`pm enable/unhide`；新增「当前已隐藏包名集合」的持久化；全局隐藏/恢复时同步该集合 |
+| `app/src/main/java/deltazero/amarok/utils/XHidePrefBridge.java` | `commitNewValues()` 改为 public；推给 XHide 的包名从「隐藏清单」改为「**当前实际隐藏的包名**」，且 `IS_ACTIVE = 集合非空 && XHide 开启` |
+| `app/src/main/java/deltazero/amarok/ui/AppListAdapter.java` | 列表项增加单击回调（不影响原有 CheckBox） |
+| `app/src/main/java/deltazero/amarok/ui/SetHideAppActivity.java` | 单击列表项弹出操作框：**启动应用 / 立即隐藏 / 取消隐藏**；启动已隐藏的应用会先自动取消隐藏再启动 |
 
-Amarok is a lightweight Android privacy tool that shields your files and apps from prying eyes without the overhead of encryption.
+效果：
 
-Traditional encryption tools are secure but slow — decrypting a large movie file or unlocking an app takes time. Amarok acts instantly. It conceals files by obfuscating signatures or adjusting permissions, and hides apps by disabling them or using Xposed hooks. This makes your content invisible to casual snoopers without any performance penalty.  
+- 勾选框仍然是「一键隐藏清单」的成员，主界面的隐藏按钮行为不变；
+- 在应用列表里对单个应用执行「立即隐藏」后，该应用被 `pm disable + pm hide`，同时被写进 XHide 的过滤集合 —— 因此**单应用隐藏也是彻底的**（系统设置、第三方包列表都看不到）；
+- 单击条目可以直接启动任意应用；对已隐藏的应用会先 `pm enable + pm unhide` 再 `startActivity`；
+- 「一键全部隐藏/恢复」仍然可用，恢复时会清空逐应用隐藏集合。
 
-> [!WARNING]
-> **Amarok is NOT an encryption tool.**  
-> Amarok hides data but does not cryptographically secure it. Do not use this tool for high-value secrets.
+---
 
-## Features
+## 2. 没有 Android Studio 怎么编译
 
-* **One-Click Privacy**: Instantly hide or unhide your selected files and apps.
-* **High-Speed Performance**: Hides large files instantly by altering signatures (Non-root) or adjusting file permissions (Root).
-* **Versatile App Hiding**:
-  * **Root-Free Support**: Hides apps from the launcher (supports Shizuku, Dhizuku, and DSM modes).
-  * **Root Support**: Leverages Xposed to *thoroughly* scrub apps from system menus and 3rd-party detection.
-* **Panic Button**: A discreet floating button to instantly hide everything.
-* **Quick Settings Tile**: Toggle visibility directly from your control center without opening the main app.
-* **Secure Access**: Protect Amarok itself with a Password or Fingerprint lock.
-* **Camouflage Mode**: Disguise Amarok as a Calendar app.
+仓库自带 GitHub Actions 工作流（`.github/workflows/build_on_push.yml`），push 后会自动
+`assembleFossDebug` 并把 APK 作为 artifact 上传。所以只需要一个 GitHub 账号：
 
-## Screenshots
+1. **Fork** `deltazefiro/Amarok-Hider` 到你自己的账号。
+2. 在你的 fork 里，把本目录下这 4 个文件按相同路径替换掉：
+   - `app/src/main/java/deltazero/amarok/Hider.java`
+   - `app/src/main/java/deltazero/amarok/utils/XHidePrefBridge.java`
+   - `app/src/main/java/deltazero/amarok/ui/AppListAdapter.java`
+   - `app/src/main/java/deltazero/amarok/ui/SetHideAppActivity.java`
 
-<table>
-  <tr>
-    <td><img src="https://github.com/deltazefiro/Amarok-Hider/assets/41465688/b3fe6b18-cb3e-488b-81cb-ff5ed005664b" alt="Image 1"></td>
-    <td><img src="https://github.com/deltazefiro/Amarok-Hider/assets/41465688/1a6f147c-286a-428c-9470-a469b4dd9f4e" alt="Image 2"></td>
-    <td><img src="https://github.com/deltazefiro/Amarok-Hider/assets/41465688/9b61b94f-26f2-4457-b189-93c75a09e7d5" alt="Image 3"></td>
-  </tr>
-  <tr>
-    <td><img src="https://github.com/deltazefiro/Amarok-Hider/assets/41465688/9ef70932-c242-4cc6-a84d-5b14ddf8a814" alt="Image 4"></td>
-    <td><img src="https://github.com/deltazefiro/Amarok-Hider/assets/41465688/3702143d-dac5-435d-9615-323ada02c63e" alt="Image 5"></td>
-    <td><img src="https://github.com/deltazefiro/Amarok-Hider/assets/41465688/a2016488-0c13-4144-93ed-5ca35179df79" alt="Image 6"></td>
-  </tr>
-</table>
+   做法：在仓库页面按 `.` 打开网页版编辑器（github.dev），进入对应文件全选粘贴后提交；
+   或者用 GitHub 的 “Upload files” 直接拖入这 4 个文件（保持目录结构）。
+3. 提交后进入 **Actions → Build on push**，等构建完成，在页面底部下载 artifact
+   `app-foss-debug`（zip 里是 `app-foss-debug.apk`）。
+4. 安装前注意（**很重要**）：
+   - debug 包用的是 debug 签名，**不能覆盖安装**官方版/旧版，必须先卸载 Amarok；
+   - 卸载前先在旧版里**取消隐藏**所有应用（否则隐藏列表会丢失，应用仍处于 disable/hide 状态，需要按官方 FAQ 手动恢复）；
+   - 卸载 → 安装新 APK → 重新配置隐藏清单。
+5. 打开 LSPosed，Amarok 模块作用域勾选 **系统框架（android）**，重启手机；再进 Amarok 打开 XHide，
+   应用隐藏模式选 **Root**。
 
-## Download
+以后我改了代码，重复第 2~3 步即可（每次都要重新下载 APK 覆盖安装，签名相同可以直接覆盖升级）。
 
-[![](https://img.shields.io/github/v/release/deltazefiro/Amarok-Hider?label=GithubRelease)](https://github.com/deltazefiro/Amarok-Hider/releases)  
-[![](https://img.shields.io/f-droid/v/deltazero.amarok.foss?color=blue)](https://f-droid.org/zh_Hans/packages/deltazero.amarok.foss/) (FOSS)  
-[![](https://img.shields.io/endpoint?url=https://apt.izzysoft.de/fdroid/api/v1/shield/deltazero.amarok.foss&color=orange)](https://apt.izzysoft.de/fdroid/index/apk/deltazero.amarok.foss)  (FOSS) (Pre-release channel)
+---
 
-## Documentation & Usage
+## 3. 用法
 
-New to Amarok? Check out our documentation for setup guides on Root, Shizuku, Dhizuku, and other app hiders.
+主界面 →「设置隐藏应用」→ 列表里：
 
-[![](https://img.shields.io/badge/AmarokDocs-ClickToView-brightgreen)](https://deltazefiro.github.io/Amarok-doc/en-US/)  
+- **单击某个应用** → 弹窗：`启动应用` / `立即隐藏` / `取消隐藏`
+  - 标题后面带「（已隐藏）」表示该包当前处于隐藏状态；
+  - 点「启动应用」时如果它是隐藏的，会先自动取消隐藏再启动（Android 不允许直接启动隐藏包）；
+- **右侧勾选框** → 决定该应用是否属于「一键隐藏」清单（原逻辑不变）；
+- 主界面「隐藏 / 取消隐藏」→ 仍然是整批操作。
 
-## Contributing
+> 说明：逐应用隐藏后，主界面开关仍显示「未隐藏」（因为全局状态没有被标记为 HIDDEN）。
+> 这是有意为之的最小改动，避免影响磁贴、悬浮球、文件隐藏等依赖全局状态的逻辑。
 
-Thank you for dedicating your time to contribute to this project!
-Contributions in all forms are welcomed, including reporting bugs, proposing new features, performing language translations, and submitting code development PRs.
+---
 
-> 🤖 **Tips for AI Assistants**  
-> Please consult `.cursor/rules` for a overview of the project structure.
+## 4. 已知限制 / 后续可以做的
 
-We use [weblate](https://hosted.weblate.org/engage/amarok-hider/) for translations.
+- 只实现了 Root 路径的逐应用隐藏（用 `su` 执行 `pm`），Shizuku/Dhizuku 下的逐应用隐藏未实现；
+- 没有做「编组」：如果你需要 A 组 / B 组分别一键切换，可以下一步在 `PrefMgr` 里加
+  `Map<组名, Set<包名>>`，列表顶部加 chip，点击时调用 `Hider.hideApp()` 循环；
+- 隐藏某个应用后，桌面图标消失属于系统行为；恢复后图标位置可能乱（Amarok 官方文档已说明）；
+- 隐藏系统应用/设备管理员类应用可能失败或被系统拒绝（`pm` 会返回错误，日志里能看到）。
 
-<a href="https://hosted.weblate.org/engage/amarok-hider/">
-<img src="https://hosted.weblate.org/widgets/amarok-hider/-/multi-auto.svg" alt="Translation status" />
-</a>
+---
 
-## Credits
+## 5. 如果 CI 编译失败
 
-A massive thank you to the open-source community:
-
-* **[aistra0528/Hail](https://github.com/aistra0528/Hail):** Core reference for the app hiding logic.
-* **[RikkaApps/Shizuku](https://github.com/RikkaApps/Shizuku) & [iamr0s/Dhizuku](https://github.com/iamr0s/Dhizuku):** For enabling root-less permissions.
-* **[Icongeek26](https://www.flaticon.com/authors/icongeek26) & [Freepik](https://www.freepik.com):** For the beautiful iconography.
-* **[Jetbrains](https://www.jetbrains.com/community/opensource/#support):** For providing IDE support.
-
-... and all the dedicated [contributors](https://github.com/deltazefiro/Amarok-Hider/graphs/contributors)!
-
-## Disclaimers
-
-**Amarok is provided "as is" without any warranties or conditions.**
-The user is fully responsible for any harm, data loss, or consequences that may arise from using Amarok. Please backup important data before using hiding tools.
-11222
+Actions 里会给出具体报错（文件:行号）。把那段报错贴给我，我按提示修正后你再提交一次即可。
+常见原因只会是我改动的这 4 个文件的语法/导入问题，修起来很快。
