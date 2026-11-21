@@ -15,6 +15,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.topjohnwu.superuser.Shell;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import deltazero.amarok.ui.settings.SwitchAppHiderActivity;
@@ -103,7 +104,11 @@ public final class Hider {
         threadHandler.post(() -> {
             Log.i(TAG, "Per-app hide: " + pkg);
             Shell.Result result = Shell.cmd("pm disable " + pkg + "; pm hide " + pkg).exec();
-            Log.i(TAG, "Per-app hide result: " + result.getCode() + " " + result.getOut());
+            Log.i(TAG, "Per-app hide result: " + result.getCode() + " " + result.getOut() + " " + result.getErr());
+            if (looksLikeFailure(result)) {
+                postToMain(() -> Toast.makeText(context, "隐藏失败：" + pkg, Toast.LENGTH_LONG).show());
+                return;
+            }
             addHiddenPkg(pkg);
             XHidePrefBridge.commitNewValues();
             postToMain(onDone);
@@ -117,7 +122,7 @@ public final class Hider {
         threadHandler.post(() -> {
             Log.i(TAG, "Per-app unhide: " + pkg);
             Shell.Result result = Shell.cmd("pm enable " + pkg + "; pm unhide " + pkg).exec();
-            Log.i(TAG, "Per-app unhide result: " + result.getCode() + " " + result.getOut());
+            Log.i(TAG, "Per-app unhide result: " + result.getCode() + " " + result.getOut() + " " + result.getErr());
             removeHiddenPkg(pkg);
             XHidePrefBridge.commitNewValues();
             postToMain(onDone);
@@ -135,6 +140,25 @@ public final class Hider {
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(intent);
+    }
+
+    private static boolean looksLikeFailure(Shell.Result result) {
+        if (result.getCode() != 0)
+            return true;
+        return containsError(result.getOut()) || containsError(result.getErr());
+    }
+
+    private static boolean containsError(List<String> lines) {
+        if (lines == null)
+            return false;
+        for (String line : lines) {
+            if (line == null)
+                continue;
+            String s = line.toLowerCase();
+            if (s.contains("error") || s.contains("exception") || s.contains("illegal") || s.contains("denied"))
+                return true;
+        }
+        return false;
     }
 
     private static void postToMain(Runnable runnable) {
@@ -177,8 +201,13 @@ public final class Hider {
                 boolean disableOnly = PrefMgr.isXHideEnabled() && PrefMgr.getDisableOnlyWithXHide();
 
                 PrefMgr.getAppHider(context).hide(PrefMgr.getHideApps(), disableOnly);
-                setHiddenPkgs(PrefMgr.getHideApps());
+
+                // Union: keep apps that were hidden individually, add the whole global list.
+                Set<String> hidden = getHiddenPkgs();
+                hidden.addAll(PrefMgr.getHideApps());
+                setHiddenPkgs(hidden);
                 XHidePrefBridge.commitNewValues();
+
                 PrefMgr.getFileHider(context).hide(PrefMgr.getHideFilePath());
             } catch (InterruptedException e) {
                 Log.w(TAG, "Process 'hide' interrupted.");
@@ -217,7 +246,13 @@ public final class Hider {
             state.postValue(State.PROCESSING);
 
             try {
-                PrefMgr.getAppHider(context).unhide(PrefMgr.getHideApps());
+                // Restore the global list *and* anything that was hidden per-app,
+                // otherwise per-app hidden packages that are not in the list would
+                // stay hidden forever.
+                Set<String> toUnhide = new HashSet<>(PrefMgr.getHideApps());
+                toUnhide.addAll(getHiddenPkgs());
+
+                PrefMgr.getAppHider(context).unhide(toUnhide);
                 setHiddenPkgs(new HashSet<>());
                 XHidePrefBridge.commitNewValues();
                 PrefMgr.getFileHider(context).unhide(PrefMgr.getHideFilePath());
