@@ -87,3 +87,4 @@ A massive thank you to the open-source community:
 
 **Amarok is provided "as is" without any warranties or conditions.**
 The user is fully responsible for any harm, data loss, or consequences that may arise from using Amarok. Please backup important data before using hiding tools.
+1122
