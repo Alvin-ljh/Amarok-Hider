@@ -16,6 +16,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import deltazero.amarok.BuildConfig;
 import deltazero.amarok.xposed.hooks.FilterHooks;
 import deltazero.amarok.xposed.hooks.IHook;
+import deltazero.amarok.xposed.hooks.LauncherAppsHooks;
 import deltazero.amarok.xposed.utils.ParceledListSliceUtil;
 import deltazero.amarok.xposed.utils.XPref;
 
@@ -61,6 +62,10 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
         } else {
             hooks.addAll(FilterHooks.legacy());
         }
+
+        // Applies to every supported Android version: covers the LauncherApps
+        // service which does not go through IPackageManager.
+        hooks.add(new LauncherAppsHooks());
 
         Log.d("Loading system hooks...", null);
         hooks.forEach(IHook::load);

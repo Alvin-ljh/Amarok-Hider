@@ -20,7 +20,7 @@ public class PrivacyCategory extends BaseCategory {
 
     private MaterialSwitchPreference biometricPref;
 
-    public PrivacyCategory(@NonNull FragmentActivity activity, PreferenceScreen screen) {
+    public PrivacyCategory(@NonNull FragmentActivity activity, @NonNull PreferenceScreen screen) {
         super(activity, screen);
         setTitle(R.string.security);
 
@@ -92,6 +92,9 @@ public class PrivacyCategory extends BaseCategory {
                             disguisePref.setChecked(false);
                             disguisePref.setEnabled(false);
                             LauncherIconController.setIconState(activity, LauncherIconController.IconState.HIDDEN);
+                            // Persist explicitly: the switch state and the actual component
+                            // state must not diverge.
+                            PrefMgr.setHideAmarokIcon(true);
                             hideAmarokIconPref.setChecked(true);
                         })
                         .setOnCancelAction(() -> {
@@ -102,6 +105,7 @@ public class PrivacyCategory extends BaseCategory {
                 return false; // Don't change the preference yet
             } else {
                 // When showing icon, re-enable disguise option
+                PrefMgr.setHideAmarokIcon(false);
                 disguisePref.setEnabled(true);
                 LauncherIconController.setIconState(activity, LauncherIconController.IconState.VISIBLE);
                 return true;

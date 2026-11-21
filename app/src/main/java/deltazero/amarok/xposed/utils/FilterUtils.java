@@ -15,15 +15,20 @@ public class FilterUtils {
     // NOTE: This method will not refresh XPref cache. Call refreshCache() before calling this method
     @SuppressLint("DefaultLocale")
     public static List<Object> filterAppsOrPkgs(List<Object> appsOrPkgs, Method m) {
-        if (!XPref.isXHideActive()) return appsOrPkgs;
+        final boolean hideHiddenApps = XPref.isXHideActive();
+        final boolean hideSelf = XPref.isHideSelfActive() && !XPref.isCallerExempt();
+
+        if (!hideHiddenApps && !hideSelf) return appsOrPkgs;
 
         AtomicInteger filteredCount = new AtomicInteger();
         var filteredPackages = appsOrPkgs.stream()
                 .filter(appOrPkg -> {
                     boolean shouldHide;
                     try {
-                        shouldHide = XPref.shouldHide(ObjectUtils.getObjectOrNullUntilSuperclassAs(
-                                appOrPkg, "packageName", null));
+                        String pkgName = ObjectUtils.getObjectOrNullUntilSuperclassAs(
+                                appOrPkg, "packageName", null);
+                        shouldHide = (hideHiddenApps && XPref.shouldHide(pkgName))
+                                || (hideSelf && XPref.isSelfPackage(pkgName));
                     } catch (NoSuchFieldException e) {
                         throw new RuntimeException(e);
                     }

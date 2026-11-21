@@ -1,5 +1,8 @@
 package deltazero.amarok.ui.settings;
 
+import android.os.Handler;
+import android.os.Looper;
+
 import androidx.annotation.NonNull;
 import androidx.fragment.app.FragmentActivity;
 import androidx.preference.Preference;
@@ -31,6 +34,21 @@ public class XHideCategory extends BaseCategory {
         enableXHide.setEnabled(XHidePrefBridge.isAvailable);
         addPreference(enableXHide);
 
+        var hideSelf = new MaterialSwitchPreference(activity);
+        hideSelf.setKey(XHidePrefBridge.HIDE_SELF_PREF);
+        hideSelf.setTitle("隐藏 Amarok 自身");
+        hideSelf.setSummary("从系统设置和其他应用的已安装列表里移除 Amarok（不影响启动）。");
+        hideSelf.setChecked(PrefMgr.getPrefs().getBoolean(XHidePrefBridge.HIDE_SELF_PREF, true));
+        hideSelf.setEnabled(XHidePrefBridge.isAvailable);
+        hideSelf.setOnPreferenceChangeListener((preference, newValue) -> {
+            PrefMgr.getPrefs().edit()
+                    .putBoolean(XHidePrefBridge.HIDE_SELF_PREF, (Boolean) newValue)
+                    .apply();
+            new Handler(Looper.getMainLooper()).post(XHidePrefBridge::commitNewValues);
+            return true;
+        });
+        addPreference(hideSelf);
+
         var disableOnlyWithXHide = new MaterialSwitchPreference(activity);
         disableOnlyWithXHide.setKey(PrefMgr.DISABLE_ONLY_WITH_XHIDE);
         disableOnlyWithXHide.setTitle(R.string.disable_only_with_xhide);
@@ -43,6 +61,7 @@ public class XHideCategory extends BaseCategory {
         // Update the skip hide step preference when XHide is toggled
         enableXHide.setOnPreferenceChangeListener((preference, newValue) -> {
             disableOnlyWithXHide.setEnabled(XHidePrefBridge.isAvailable && (boolean) newValue);
+            new Handler(Looper.getMainLooper()).post(XHidePrefBridge::commitNewValues);
             return true;
         });
     }
