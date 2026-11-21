@@ -121,6 +121,7 @@ public class MainActivity extends AmarokActivity {
             final Set<String> pkgs = new HashSet<>(PrefMgr.getHideApps());
             pkgs.addAll(hidden);
 
+            final float labelSize = PrefMgr.getPrefs().getInt("grid_label_size", 10);
             final List<AppGridAdapter.GridApp> list = new ArrayList<>();
             for (String pkg : pkgs) {
                 try {
@@ -129,7 +130,7 @@ public class MainActivity extends AmarokActivity {
                                     | PackageManager.MATCH_DISABLED_COMPONENTS);
                     Drawable icon = pm.getApplicationIcon(ai);
                     String label = pm.getApplicationLabel(ai).toString();
-                    list.add(new AppGridAdapter.GridApp(pkg, label, icon, hidden.contains(pkg)));
+                    list.add(new AppGridAdapter.GridApp(pkg, label, icon, hidden.contains(pkg), labelSize));
                 } catch (Exception ignored) {
                     // Package no longer installed
                 }

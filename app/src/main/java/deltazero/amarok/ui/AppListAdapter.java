@@ -24,14 +24,9 @@ public class AppListAdapter extends ListAdapter<AppInfo, AppListAdapter.AppListH
         void onAppToggled(AppInfo app);
     }
 
-    public interface OnAppClickListener {
-        void onAppClicked(AppInfo app);
-    }
+    private final OnAppToggleListener listener;
 
-    private final OnAppToggleListener toggleListener;
-    private final OnAppClickListener clickListener;
-
-    public AppListAdapter(OnAppToggleListener toggleListener, OnAppClickListener clickListener) {
+    public AppListAdapter(OnAppToggleListener listener) {
         super(new DiffUtil.ItemCallback<>() {
             @Override
             public boolean areItemsTheSame(@NonNull AppInfo oldItem, @NonNull AppInfo newItem) {
@@ -43,8 +38,7 @@ public class AppListAdapter extends ListAdapter<AppInfo, AppListAdapter.AppListH
                 return oldItem.packageName().equals(newItem.packageName()) && oldItem.label().equals(newItem.label());
             }
         });
-        this.toggleListener = toggleListener;
-        this.clickListener = clickListener;
+        this.listener = listener;
     }
 
     @NonNull
@@ -57,7 +51,7 @@ public class AppListAdapter extends ListAdapter<AppInfo, AppListAdapter.AppListH
     @Override
     public void onBindViewHolder(@NonNull AppListHolder holder, int position) {
         AppInfo app = getCurrentList().get(position);
-        holder.bind(app, toggleListener, clickListener);
+        holder.bind(app, listener);
     }
 
     public static class AppListHolder extends RecyclerView.ViewHolder {
@@ -75,7 +69,7 @@ public class AppListAdapter extends ListAdapter<AppInfo, AppListAdapter.AppListH
             ivAppIcon = view.findViewById(R.id.hideapp_iv_appicon);
         }
 
-        void bind(AppInfo app, OnAppToggleListener toggleListener, OnAppClickListener clickListener) {
+        void bind(AppInfo app, OnAppToggleListener listener) {
             currentApp = app;
             tvAppName.setText(app.label());
             tvPkgName.setText(app.packageName());
@@ -84,15 +78,8 @@ public class AppListAdapter extends ListAdapter<AppInfo, AppListAdapter.AppListH
 
             cbIsHidden.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 if (currentApp != null && buttonView.isPressed()) {
-                    toggleListener.onAppToggled(currentApp);
+                    listener.onAppToggled(currentApp);
                 }
-            });
-
-            // Single tap on the row opens the per-app action dialog
-            // (launch / hide now / unhide now).
-            itemView.setOnClickListener(v -> {
-                if (currentApp != null && clickListener != null)
-                    clickListener.onAppClicked(currentApp);
             });
         }
     }

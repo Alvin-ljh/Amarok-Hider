@@ -1,10 +1,12 @@
 package deltazero.amarok.ui;
 
 import android.graphics.drawable.Drawable;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.DiffUtil;
@@ -26,7 +28,8 @@ public class AppGridAdapter extends ListAdapter<AppGridAdapter.GridApp, AppGridA
         void onAppLongClicked(GridApp app);
     }
 
-    public record GridApp(String packageName, String label, Drawable icon, boolean hidden) {
+    public record GridApp(String packageName, String label, Drawable icon, boolean hidden,
+                          float labelSize) {
     }
 
     private final OnAppClickListener clickListener;
@@ -43,7 +46,8 @@ public class AppGridAdapter extends ListAdapter<AppGridAdapter.GridApp, AppGridA
             public boolean areContentsTheSame(@NonNull GridApp oldItem, @NonNull GridApp newItem) {
                 return oldItem.packageName().equals(newItem.packageName())
                         && oldItem.hidden() == newItem.hidden()
-                        && oldItem.label().equals(newItem.label());
+                        && oldItem.label().equals(newItem.label())
+                        && oldItem.labelSize() == newItem.labelSize();
             }
         });
         this.clickListener = clickListener;
@@ -63,6 +67,9 @@ public class AppGridAdapter extends ListAdapter<AppGridAdapter.GridApp, AppGridA
         GridApp app = getCurrentList().get(position);
         holder.icon.setImageDrawable(app.icon());
         holder.icon.setAlpha(app.hidden() ? 0.35f : 1f);
+        holder.label.setText(app.label());
+        holder.label.setTextSize(TypedValue.COMPLEX_UNIT_SP, app.labelSize());
+        holder.label.setAlpha(app.hidden() ? 0.5f : 1f);
         holder.itemView.setOnClickListener(v -> clickListener.onAppClicked(app));
         holder.itemView.setOnLongClickListener(v -> {
             longClickListener.onAppLongClicked(app);
@@ -72,10 +79,12 @@ public class AppGridAdapter extends ListAdapter<AppGridAdapter.GridApp, AppGridA
 
     public static class Holder extends RecyclerView.ViewHolder {
         final ImageView icon;
+        final TextView label;
 
         Holder(@NonNull View itemView) {
             super(itemView);
             icon = itemView.findViewById(R.id.grid_item_icon);
+            label = itemView.findViewById(R.id.grid_item_label);
         }
     }
 }

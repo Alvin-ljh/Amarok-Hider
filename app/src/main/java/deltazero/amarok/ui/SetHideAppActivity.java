@@ -1,6 +1,5 @@
 package deltazero.amarok.ui;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -19,9 +18,7 @@ import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import deltazero.amarok.AmarokActivity;
-import deltazero.amarok.Hider;
 import deltazero.amarok.R;
-import deltazero.amarok.utils.AppInfoUtil.AppInfo;
 
 public class SetHideAppActivity extends AmarokActivity {
 
@@ -61,9 +58,7 @@ public class SetHideAppActivity extends AmarokActivity {
     }
 
     private void setupRecyclerView() {
-        adapter = new AppListAdapter(
-                app -> viewModel.toggleAppHidden(app),
-                this::showAppActions);
+        adapter = new AppListAdapter(app -> viewModel.toggleAppHidden(app));
         rvAppList.setAdapter(adapter);
         rvAppList.setLayoutManager(new LinearLayoutManager(this));
     }
@@ -79,44 +74,6 @@ public class SetHideAppActivity extends AmarokActivity {
         });
 
         viewModel.isLoading().observe(this, isLoading -> srLayout.setRefreshing(isLoading));
-    }
-
-    /**
-     * Per-app actions: launch, hide now, unhide now.
-     * Requires Root mode (per-app hiding runs `pm disable/pm hide` through su).
-     */
-    private void showAppActions(AppInfo app) {
-        final String pkg = app.packageName();
-        final boolean isHidden = Hider.getHiddenPkgs().contains(pkg);
-        final String title = app.label() + (isHidden ? "（已隐藏）" : "");
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(title)
-                .setItems(new CharSequence[]{"启动应用", "立即隐藏", "取消隐藏"}, (dialog, which) -> {
-                    switch (which) {
-                        case 0 -> {
-                            if (isHidden)
-                                Hider.unhideApp(this, pkg, () -> launchApp(app));
-                            else
-                                launchApp(app);
-                        }
-                        case 1 -> Hider.hideApp(this, pkg, () ->
-                                Toast.makeText(this, "已隐藏：" + app.label(), Toast.LENGTH_SHORT).show());
-                        case 2 -> Hider.unhideApp(this, pkg, () ->
-                                Toast.makeText(this, "已取消隐藏：" + app.label(), Toast.LENGTH_SHORT).show());
-                    }
-                })
-                .show();
-    }
-
-    private void launchApp(AppInfo app) {
-        Intent intent = getPackageManager().getLaunchIntentForPackage(app.packageName());
-        if (intent == null) {
-            Toast.makeText(this, "无法启动该应用（可能仍处于隐藏状态）", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(intent);
     }
 
     private void setupFilterMenu() {

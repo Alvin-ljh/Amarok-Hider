@@ -32,6 +32,12 @@ public class AppearanceCategory extends BaseCategory {
             R.string.dark_theme_dark
     };
 
+    /** Shared with MainActivity: font size (sp) of the app names in the icon grid. */
+    private static final String GRID_LABEL_SIZE = "grid_label_size";
+    private static final int GRID_LABEL_SIZE_DEFAULT = 10;
+    private static final int[] GRID_LABEL_SIZES = {8, 10, 12, 14, 16};
+    private static final String[] GRID_LABEL_SIZE_NAMES = {"小", "标准", "大", "特大", "超大"};
+
     public AppearanceCategory(@NonNull FragmentActivity activity, @NonNull PreferenceScreen screen) {
         super(activity, screen);
         setTitle(R.string.appearance);
@@ -59,6 +65,16 @@ public class AppearanceCategory extends BaseCategory {
             return true;
         });
         addPreference(darkThemePref);
+
+        // App name font size on the main grid
+        var labelSizePref = new Preference(activity);
+        labelSizePref.setTitle("图标文字大小");
+        labelSizePref.setSummary(getLabelSizeSummary());
+        labelSizePref.setOnPreferenceClickListener(preference -> {
+            showLabelSizeDialog(labelSizePref);
+            return true;
+        });
+        addPreference(labelSizePref);
 
         var languagePref = new Preference(activity);
         languagePref.setTitle(R.string.language);
@@ -89,6 +105,36 @@ public class AppearanceCategory extends BaseCategory {
             return true;
         });
         addPreference(invertTileColorPref);
+    }
+
+    private String getLabelSizeSummary() {
+        int current = PrefMgr.getPrefs().getInt(GRID_LABEL_SIZE, GRID_LABEL_SIZE_DEFAULT);
+        for (int i = 0; i < GRID_LABEL_SIZES.length; i++) {
+            if (GRID_LABEL_SIZES[i] == current)
+                return GRID_LABEL_SIZE_NAMES[i] + "（" + current + "sp）";
+        }
+        return "标准（" + GRID_LABEL_SIZE_DEFAULT + "sp）";
+    }
+
+    private void showLabelSizeDialog(Preference labelSizePref) {
+        int current = PrefMgr.getPrefs().getInt(GRID_LABEL_SIZE, GRID_LABEL_SIZE_DEFAULT);
+        int checked = 1;
+        for (int i = 0; i < GRID_LABEL_SIZES.length; i++) {
+            if (GRID_LABEL_SIZES[i] == current)
+                checked = i;
+        }
+
+        new MaterialAlertDialogBuilder(activity)
+                .setTitle("图标文字大小")
+                .setSingleChoiceItems(GRID_LABEL_SIZE_NAMES, checked, (dialog, which) -> {
+                    PrefMgr.getPrefs().edit()
+                            .putInt(GRID_LABEL_SIZE, GRID_LABEL_SIZES[which])
+                            .apply();
+                    labelSizePref.setSummary(getLabelSizeSummary());
+                    dialog.dismiss();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     private void showDarkThemeDialog(FragmentActivity activity, Preference darkThemePref) {
